@@ -1,0 +1,305 @@
+================================================================================
+          SMART AI CREDIT MANAGEMENT AND UTILIZATION ADVISOR
+           COMPLETE PROJECT WORKFLOW, FEATURES & FUNCTION REFERENCE
+================================================================================
+
+1. PROJECT OVERVIEW & ARCHITECTURE
+--------------------------------------------------------------------------------
+The "Smart AI Credit Management and Utilization Advisor" is a full-stack AI platform
+governance and credit tracking web application. It features an automated Hybrid Data
+Collection System that automatically ingests AI usage information across three
+independent data sources, processes it through a unified deduplication layer, updates
+an automated Machine Learning forecasting pipeline, and provides real-time credit
+exhaustion predictions and optimization recommendations.
+
+Architecture Flow:
+                  
+                    User / Web Browser
+                            │
+               ┌────────────┼────────────┐
+               │            │            │
+               ▼            ▼            ▼
+        Official APIs   Chrome Ext.   Manual Entry
+        (OpenAI, etc.) (7 Websites)    (Fallback)
+               │            │            │
+               └────────────┼────────────┘
+                            ▼
+             Data Synchronization Layer
+         (Normalize, Deduplicate, Validate)
+                            ▼
+              Database (PostgreSQL / SQLite)
+           (CreditUsageLog, IngestedEvent, etc.)
+                            ▼
+              Automated ML Prediction Engine
+          (scikit-learn & XGBoost Regressors)
+                            ▼
+           Dashboard & AI Advisor Recommendations
+
+
+================================================================================
+2. HYBRID DATA COLLECTION SYSTEM (3 DATA SOURCES)
+================================================================================
+
+SOURCE 1: OFFICIAL AI PROVIDER APIs
+-----------------------------------
+- Integrates via official REST APIs for key providers:
+  1. OpenAI API (Models: gpt-4o, gpt-4o-mini, o1-preview, o3-mini)
+  2. Anthropic API (Models: claude-3-5-sonnet, claude-3-opus, claude-3-5-haiku)
+  3. Google Gemini API (Models: gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash-exp)
+  4. Perplexity API (Models: sonar, sonar-pro, sonar-reasoning)
+  5. Extensible Provider Factory (Open/Closed principle for future AI providers)
+- Key Capabilities per Provider:
+  * Connect (Credential Validation & Encryption)
+  * Disconnect (Clears stored secrets)
+  * Sync Usage (Fetch active prompt counts & token usage)
+  * Sync Billing (Fetches credits; displays "Not Supported" if provider API doesn't expose billing)
+  * Sync Subscription (Fetches active plan & renewal status)
+  * Sync Models (Fetches list of available provider models)
+  * Background Sync (Background job sync)
+- Encryption: Fernet 256-bit symmetric encryption at rest. Keys masked in responses.
+
+
+SOURCE 2: CHROME BROWSER EXTENSION (MANIFEST V3)
+------------------------------------------------
+- Directory: /extension
+- Supported AI Web Platforms:
+  1. chatgpt.com
+  2. claude.ai
+  3. gemini.google.com
+  4. perplexity.ai
+  5. cursor.com
+  6. bolt.new
+  7. lovable.dev
+- Responsibilities:
+  * Active Site & Model Detection via DOM watchers and selectors
+  * Active Session Duration Tracking (Heartbeat timer)
+  * Prompt Count Tracking (Submit click listeners & Enter key interceptors)
+  * Timestamp & Page URL Context capturing
+  * Secure JWT Authorization header communication with backend (/api/v1/ingestion/extension-event)
+  * PRIVACY GUARANTEE: Does NOT collect prompt text contents by default.
+  * Extension Popup UI for JWT authentication token pairing.
+
+
+SOURCE 3: MANUAL ENTRY (FALLBACK)
+---------------------------------
+- Used when automatic API/extension tracking is unavailable.
+- Inputs: Platform name, Model name, Project name, Task type, Credits used, Prompt count, Token usage, Usage date, Notes.
+- Ingested directly through the unified Data Synchronization Layer.
+
+
+================================================================================
+3. COMPLETE LIST OF PAGES & FEATURES
+================================================================================
+
+--------------------------------------------------------------------------------
+PAGE 1: LOGIN & REGISTRATION (/login, /register)
+--------------------------------------------------------------------------------
+Features & Functions:
+- User Registration with full name, email, password validation.
+- User Login with JWT authentication (Access & Refresh token generation).
+- Forgot Password & Reset Password workflow via secure token reset links.
+- Persistent session management stored in browser localStorage.
+
+
+--------------------------------------------------------------------------------
+PAGE 2: DASHBOARD (/)
+--------------------------------------------------------------------------------
+Features & Functions:
+- Top Sync Banner (SyncStatusWidget):
+  * Displays Auto-Sync active toggle status.
+  * Displays Last Synchronization timestamp in Indian Standard Time (IST).
+  * "Manual Sync Now" Button: Triggers immediate sync across all connected providers.
+- Overview Metric Cards (StatCards):
+  * Total Credits Used across all AI services.
+  * Total Spend in USD.
+  * Number of Active AI Services Tracked.
+  * Most Used Service indicator with weekly trend comparisons.
+- ML Prediction & Credit Exhaustion Forecast Card:
+  * Best ML Model algorithm indicator (Linear Regression, Random Forest, XGBoost).
+  * Tomorrow's Predicted Credit Usage.
+  * Weekly Forecasted Credit Usage.
+  * Monthly Forecasted Spend (USD).
+  * Credit Exhaustion Date & Days Remaining countdown.
+- Connected AI Providers Widget:
+  * Interactive cards for OpenAI, Anthropic, Gemini, Perplexity.
+  * Status badges: Connected / Disconnected.
+  * Masked API Key previews (e.g. sk-proj...1234).
+  * Billing Capability badges ("Supported" vs "Not Supported").
+  * Model tags list per provider.
+  * Connect / Disconnect Modals with API key validation.
+- Data Source Breakdown Widget:
+  * Visual progress bar comparing usage collected from Official API vs Browser Extension vs Manual Entry.
+  * Event count and percentage breakdown by source.
+- Real-Time Latest Usage Stream:
+  * Ticker feed showing latest incoming telemetry events (Platform, Model, Prompts, Duration, Credits, Timestamp in IST).
+- 30-Day Usage Trend Chart:
+  * Interactive Recharts area chart showing daily credits used vs daily cost.
+- AI Advisor Recommendations Panel:
+  * Real-time rule-based & ML optimization recommendations (warning, info, success priority cards).
+- Synchronization Audit History Table:
+  * Audit log of recent sync executions (Provider, Source, Status, Records Ingested, Sync Time in IST, Details).
+
+
+--------------------------------------------------------------------------------
+PAGE 3: AI PLATFORMS MANAGEMENT (/platforms)
+--------------------------------------------------------------------------------
+Features & Functions:
+- Managed Platforms Overview Cards:
+  * Total Managed Platforms count.
+  * Aggregate Monthly Spend sum.
+  * Aggregate Remaining Credits balance.
+  * Supported Platforms Catalog readiness count (8 Ready).
+- Supported Platforms Grid & Catalog:
+  * Preset platforms: ChatGPT, Claude, Gemini, Cursor, GitHub Copilot, Perplexity, Lovable, Bolt.
+- Platform Action Capabilities:
+  * Add AI Platform Modal (Subscription plan, monthly cost, credits, renewal date, API key).
+  * Edit Platform Modal (Update credits, renewal date, plan, status).
+  * Delete Platform confirmation.
+  * Reveal API Key Modal (Decrypts and displays raw API key for user inspection).
+- Filtering & Views:
+  * Search bar for platform name or subscription plan.
+  * Status filters: All, Active, Warning, Expired, Paused.
+  * Toggle View Mode: Grid Cards vs List Table.
+
+
+--------------------------------------------------------------------------------
+PAGE 4: CREDITS & USAGE LOGS (/credits)
+--------------------------------------------------------------------------------
+Features & Functions:
+- Top Metric Cards:
+  * Total Credits Tracked across manually logged & extension events.
+  * Total Prompts Logged.
+  * Total Tokens Consumed.
+  * Total History Entries count.
+- Usage Distribution Charts:
+  * Credit Usage Trends (Daily, Weekly, Monthly toggle views).
+  * Platform Usage Share Pie Chart.
+  * Task Type Distribution Bar Chart.
+- Filter & Search History Controls:
+  * Search input (filters project name, model, notes).
+  * Platform filter dropdown (All, OpenAI, Anthropic, Gemini, Cursor, etc.).
+  * Task Type filter dropdown (Code Generation, Debugging, Writing, Research, etc.).
+  * Start Date & End Date range pickers.
+  * Reset Filters button.
+- Usage Log History Table:
+  * Displays Date & Time in Indian Standard Time (IST) format (YYYY-MM-DD HH:MM:SS AM/PM).
+  * Columns: Date & Time, Platform badge, Model name, Project name, Task Type tag, Credits Used, Prompt count, Token count, Action buttons (Edit, Delete).
+- Add / Edit Usage Record Modal:
+  * Form to manually record or edit credit usage records.
+  * Auto-calculates credits, prompts, and tokens.
+  * Flexible platform & model selection.
+
+
+--------------------------------------------------------------------------------
+PAGE 5: ANALYTICS & ML INSIGHTS (/analytics)
+--------------------------------------------------------------------------------
+Features & Functions:
+- High-level analytics overview breakdown per service.
+- 30-day historical consumption trends.
+- Machine Learning Analytics Pipeline endpoint (/api/v1/analytics/ml):
+  * Algorithm performance evaluation comparison (MAE, RMSE, R^2 score for Linear Regression, Random Forest, XGBoost).
+  * Feature importance ranking (Day Index, Day of Week, Is Weekend).
+  * 14-day future usage forecast series.
+
+
+--------------------------------------------------------------------------------
+PAGE 6: AI ADVISOR (/recommendations)
+--------------------------------------------------------------------------------
+Features & Functions:
+- High-priority depletion warnings for platforms with <10% credits remaining.
+- Mid-priority monitor alerts for platforms with 70-90% usage.
+- Optimization suggestions for switching between expensive and cost-effective models.
+
+
+--------------------------------------------------------------------------------
+PAGE 7: PROFILE & SETTINGS (/profile, /settings)
+--------------------------------------------------------------------------------
+Features & Functions:
+- Profile Information Form: Edit Full Name, Avatar URL.
+- Change Password Form: Current password verification + new password update.
+- Chrome Browser Extension Pairing Section:
+  * Displays Chrome Extension Pairing information.
+  * 1-Click "Copy Extension Token" button: Copies JWT access token to clipboard for pairing with Chrome extension.
+- Preferences & Notifications: Toggle credit threshold alerts, weekly reports, and AI advisor recommendations.
+- Theme Selection: Dark mode toggle.
+
+
+================================================================================
+4. BACKEND ENDPOINTS & CORE SERVICES
+================================================================================
+
+AUTH ROUTES (/api/v1/auth)
+- POST /register         : Register new user
+- POST /login            : Login & receive JWT access + refresh tokens
+- POST /refresh          : Refresh expired access token
+
+USER ROUTES (/api/v1/users)
+- GET  /me               : Fetch current user profile
+- PATCH /me              : Update user profile
+- POST /change-password  : Update account password
+
+PLATFORM ROUTES (/api/v1/platforms)
+- GET  /supported        : List 8 supported AI platforms catalog
+- GET  /                 : List user's managed platforms
+- POST /                 : Add platform subscription & encrypted API key
+- PUT  /{id}             : Update platform details
+- DELETE /{id}           : Remove platform
+- GET  /{id}/reveal-key  : Decrypt and reveal API key
+
+PROVIDER SYNC ROUTES (/api/v1/providers)
+- GET  /status           : Get connection status, masked keys, & billing capability for all providers
+- POST /connect          : Connect provider with encrypted API key & initial sync
+- POST /disconnect       : Disconnect provider
+- POST /sync/{provider}  : Run sync for a single provider
+- POST /sync-all         : Manual Sync Button endpoint (syncs all connected providers)
+- GET  /history          : Retrieve sync execution audit logs
+
+DATA INGESTION ROUTES (/api/v1/ingestion)
+- POST /extension-event  : Ingest telemetry from Chrome Browser Extension (JWT authenticated)
+- POST /manual           : Ingest manual entry through Data Synchronization Layer
+- GET  /source-breakdown : Return percentage & count breakdown by source (API vs Extension vs Manual)
+- GET  /latest-events    : Return real-time stream of ingested usage events
+
+CREDIT LOG ROUTES (/api/v1/credits/logs)
+- GET  /                 : List credit usage logs with search, filter & pagination
+- POST /                 : Create credit log entry
+- GET  /charts           : Get aggregated daily, weekly, monthly chart data
+- GET  /{id}             : Get single credit log
+- PUT  /{id}             : Update credit log
+- DELETE /{id}           : Delete credit log
+
+ANALYTICS & ML ROUTES (/api/v1/analytics)
+- GET  /overview         : Total credits, total cost, services tracked
+- GET  /trends           : 30-day usage trends
+- GET  /ml               : Run ML prediction engine & return exhaustion date + forecasts
+
+
+================================================================================
+5. SECURITY & DATABASE ARCHITECTURE
+================================================================================
+
+SECURITY & ENCRYPTION
+- Password Hashing: bcrypt (via passlib).
+- API Key Encryption: Fernet 256-bit URL-safe symmetric key derived from JWT secret.
+- Secret Exposure Safeguard: API keys are masked (e.g. sk-proj...1234) in API responses.
+- Authentication: Short-lived JWT Access Tokens (30 min) + Long-lived Refresh Tokens (7 days).
+
+DATABASE TABLES (PostgreSQL / SQLite)
+1. users                 : User credentials, full name, avatar, superuser flags.
+2. user_platforms        : Connected platform credentials, encrypted API keys, sync status, capabilities.
+3. credit_entries        : Summarized per-service credit balances, total cost, remaining credits.
+4. credit_usage_logs     : Detailed credit usage logs (platform, model, project, task type, prompts, tokens, usage_date).
+5. ingested_usage_events : Raw telemetry events from API, Extension, Manual entries with unique sync_hash deduplication.
+6. sync_history          : Audit log of synchronization job runs.
+7. ai_services           : Catalog of supported AI services.
+
+
+================================================================================
+6. SUMMARY OF VERIFIED STATUS
+================================================================================
+- Backend Execution: Verified clean imports and live running FastAPI uvicorn server on http://127.0.0.1:8000.
+- Frontend Build: Verified clean TypeScript build (npx tsc --noEmit: 0 errors).
+- Chrome Extension: Manifest V3 extension ready in /extension.
+- Database Schema: Fully migrated with columns for hybrid sync and seeded initial data.
+- Time Zone Formatting: Formatted using Indian Standard Time (IST) with 12-hour AM/PM format.
+================================================================================

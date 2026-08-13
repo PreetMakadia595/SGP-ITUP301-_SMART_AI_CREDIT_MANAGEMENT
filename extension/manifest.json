@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Smart AI Credit Advisor Tracker",
+  "version": "1.0.0",
+  "description": "Automated hybrid usage tracking for ChatGPT, Claude, Gemini, Perplexity, Cursor, Bolt, and Lovable.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://*.claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://*.perplexity.ai/*",
+    "https://*.cursor.com/*",
+    "https://bolt.new/*",
+    "https://*.lovable.dev/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://*.claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://*.perplexity.ai/*",
+        "https://*.cursor.com/*",
+        "https://bolt.new/*",
+        "https://*.lovable.dev/*"
+      ],
+      "js": ["content_script.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "AI Credit Advisor"
+  }
+}
