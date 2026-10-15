@@ -5,6 +5,7 @@ from app.models.platform import UserPlatform
 from app.models.credit_log import CreditUsageLog
 from app.models.data_sync import IngestedUsageEvent, SyncHistory
 from app.models.task_advisor import TaskAdvisorRequest
+from app.models.notification import Notification, NotificationPreference
 
 __all__ = [
     "User",
@@ -15,4 +16,6 @@ __all__ = [
     "IngestedUsageEvent",
     "SyncHistory",
     "TaskAdvisorRequest",
+    "Notification",
+    "NotificationPreference",
 ]

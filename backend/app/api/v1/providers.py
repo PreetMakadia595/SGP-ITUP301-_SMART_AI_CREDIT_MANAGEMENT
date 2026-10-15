@@ -5,6 +5,7 @@ import json
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.database import get_db
 from app.dependencies import get_current_active_user
@@ -37,14 +38,28 @@ def get_providers_status(
         .filter(UserPlatform.user_id == current_user.id)
         .all()
     )
-    platform_map = {p.platform_name.lower(): p for p in user_platforms}
+    # Build a multi-key map: both stored name and all known slug aliases point to the same record
+    SLUG_ALIASES = {
+        "openai": ["openai", "open ai"],
+        "anthropic": ["anthropic", "anthropic (claude)", "claude"],
+        "gemini": ["gemini", "google gemini", "google"],
+        "perplexity": ["perplexity", "perplexity ai"],
+    }
+    platform_map: dict = {}
+    for p in user_platforms:
+        name_lower = p.platform_name.lower().strip()
+        platform_map[name_lower] = p
+        # Also register under canonical slug aliases
+        for canonical_slug, aliases in SLUG_ALIASES.items():
+            if name_lower in aliases or name_lower == canonical_slug:
+                platform_map[canonical_slug] = p
 
     response = []
     for prov in supported:
         slug = prov["slug"]
         plat = platform_map.get(slug)
 
-        is_connected = bool(plat and plat.encrypted_api_key and plat.status == "active")
+        is_connected = bool(plat and plat.encrypted_api_key and plat.status not in ("disconnected", ""))
         raw_key = decrypt_api_key(plat.encrypted_api_key) if plat and plat.encrypted_api_key else None
         masked = mask_api_key(raw_key) if raw_key else None
 
@@ -104,15 +119,29 @@ async def connect_provider(
 
     encrypted = encrypt_api_key(body.api_key)
 
-    # Upsert UserPlatform
+    # Upsert UserPlatform — search by both slug and display name
     plat = (
         db.query(UserPlatform)
         .filter(
             UserPlatform.user_id == current_user.id,
-            UserPlatform.platform_name.ilike(body.provider_slug),
+            func.lower(UserPlatform.platform_name).in_([
+                body.provider_slug.lower(),
+                provider_impl.provider_name.lower(),
+            ]),
         )
         .first()
     )
+
+    # Fallback: fuzzy match (e.g. "OpenAI" contains "openai")
+    if not plat:
+        plat = (
+            db.query(UserPlatform)
+            .filter(
+                UserPlatform.user_id == current_user.id,
+                UserPlatform.platform_name.ilike(f"%{body.provider_slug}%"),
+            )
+            .first()
+        )
 
     if not plat:
         plat = UserPlatform(
@@ -134,8 +163,9 @@ async def connect_provider(
         plat.auto_sync_enabled = body.auto_sync_enabled
 
     db.commit()
+    db.refresh(plat)  # Ensure the row is fully committed and visible
 
-    # Immediate initial sync
+    # Immediate initial sync (platform record is now persisted)
     sync_service = DataSyncService(db)
     sync_res = await sync_service.sync_provider(current_user.id, body.provider_slug)
 
@@ -153,14 +183,30 @@ def disconnect_provider(
     db: Session = Depends(get_db),
 ):
     """Disconnect an AI Provider and remove encrypted credentials."""
+    slug_lower = body.provider_slug.lower()
+    # Search by exact slug or by display name containing the slug
     plat = (
         db.query(UserPlatform)
         .filter(
             UserPlatform.user_id == current_user.id,
-            UserPlatform.platform_name.ilike(body.provider_slug),
+            func.lower(UserPlatform.platform_name).in_([
+                slug_lower,
+                slug_lower.replace("-", " "),
+            ]),
         )
         .first()
     )
+    # Fallback fuzzy match
+    if not plat:
+        plat = (
+            db.query(UserPlatform)
+            .filter(
+                UserPlatform.user_id == current_user.id,
+                UserPlatform.platform_name.ilike(f"%{body.provider_slug}%"),
+                UserPlatform.encrypted_api_key.isnot(None),
+            )
+            .first()
+        )
 
     if plat:
         plat.encrypted_api_key = None

@@ -1,287 +1,349 @@
 /**
- * Machine Learning Analytics & Forecasting Dashboard Page
+ * Predictive Analytics & AI Consumption Forecasting Page
+ * Focuses purely on user-understandable predictions and actionable insights.
  */
 import { useEffect, useState } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, BarChart, Bar, Cell
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
 } from "recharts";
 import {
-  BrainCircuit, Calendar, RefreshCw, AlertTriangle,
-  TrendingUp, BarChart3, HelpCircle, CheckCircle2, ShieldCheck
+  BrainCircuit,
+  Calendar,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  Zap,
+  Sparkles,
+  ShieldCheck,
+  ArrowRight,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
-import { getMLAnalytics } from "@/api/ingestion";
-
-interface ModelMetric {
-  algorithm_name: string;
-  mae: number;
-  rmse: number;
-  r2_score: number;
-  is_best: boolean;
-}
-
-interface ForecastPoint {
-  date: string;
-  actual_credits: number | null;
-  predicted_credits: number;
-  is_future: boolean;
-}
-
-interface FeatureImportance {
-  feature: string;
-  importance: number;
-}
-
-interface MLAnalyticsData {
-  tomorrow_usage: number;
-  weekly_usage: number;
-  monthly_cost: number;
-  credit_exhaustion_date: string;
-  days_until_exhaustion: number;
-  best_model_name: string;
-  models_evaluation: ModelMetric[];
-  forecast_series: ForecastPoint[];
-  feature_importances: FeatureImportance[];
-}
+import { getSmartPredictions } from "@/api/ingestion";
+import { MLPredictionsResponse, UserFriendlyPrediction } from "@/types/ml";
+import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 
 export default function Analytics() {
-  const [data, setData] = useState<MLAnalyticsData | null>(null);
+  const [data, setData] = useState<MLPredictionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-  const fetchAnalytics = async () => {
+  const fetchPredictions = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getMLAnalytics();
+      const res = await getSmartPredictions();
       setData(res);
-    } catch (err) {
-      setError("Failed to fetch ML analytics predictions. Please ensure your backend is running.");
+    } catch {
+      // Fallback
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAnalytics();
+    fetchPredictions();
   }, []);
 
-  const COLORS = ["#7c3aed", "#06b6d4", "#10b981", "#f59e0b"];
+  // Build forecast series from real API — show nothing if absent
+  const forecastData = data?.forecast_series
+    ? data.forecast_series.map((pt) => ({
+        date: pt.date.slice(5),
+        actual: pt.actual_credits,
+        forecast: pt.predicted_credits,
+        is_future: pt.is_future,
+      }))
+    : [];
+
+  const hasForecastData = forecastData.length > 0;
+
+  // Only show predictions from real API data
+  const predictionsList = data?.predictions_list ?? [];
+  const isCalibrating = data?.status === "calibrating" || (!loading && !data);
+
+  const getCategoryIcon = (cat: string) => {
+    switch (cat) {
+      case "spending":
+        return <TrendingDown size={18} className="text-emerald-400" />;
+      case "tomorrow_ai":
+        return <Zap size={18} className="text-cyan-400" />;
+      case "renewal_risk":
+        return <Calendar size={18} className="text-amber-400" />;
+      case "preferred_ai":
+        return <Sparkles size={18} className="text-purple-400" />;
+      case "usage_pattern":
+        return <Clock size={18} className="text-indigo-400" />;
+      case "budget_forecast":
+      default:
+        return <ShieldCheck size={18} className="text-emerald-400" />;
+    }
+  };
+
+  const getBadgeClass = (variant: string) => {
+    switch (variant) {
+      case "success":
+        return "bg-emerald-500/10 text-emerald-300 border-emerald-500/30";
+      case "warning":
+        return "bg-amber-500/10 text-amber-300 border-amber-500/30";
+      case "brand":
+        return "bg-brand-600/20 text-brand-300 border-brand-500/30";
+      case "info":
+      default:
+        return "bg-cyan-500/10 text-cyan-300 border-cyan-500/30";
+    }
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-fade-in pb-16">
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <BrainCircuit className="text-brand-400" size={24} />
-            Machine Learning Insights & Forecasting
-          </h2>
-          <p className="text-sm text-slate-400 mt-0.5">
-            Regression metrics comparison and consumption forecasting models
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <BrainCircuit className="text-brand-400" size={24} />
+              AI Predictions & Consumption Forecast
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-brand-600/20 text-brand-300 text-xs font-semibold border border-brand-500/30">
+              Proactive Insights
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Automated background predictions for upcoming AI requirements, future spending, and renewals.
           </p>
         </div>
-        <button
-          onClick={fetchAnalytics}
-          className="btn-secondary flex items-center gap-2 text-sm"
-          disabled={loading}
-        >
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          Re-train Models
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchPredictions}
+            className="btn-secondary flex items-center gap-2 text-xs py-2 px-3.5"
+            disabled={loading}
+          >
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            Re-calculate Forecast
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="glass-card p-6 h-28 animate-pulse" />
-          ))}
-        </div>
-      ) : error ? (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-          {error}
-        </div>
-      ) : data ? (
-        <>
-          {/* Top ML Analytics Stat Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="glass-card p-5 border border-white/5 space-y-1">
-              <span className="text-xs text-slate-400">Tomorrow's Forecast</span>
-              <p className="text-2xl font-bold text-purple-300">
-                {data.tomorrow_usage} <span className="text-xs text-slate-400">credits</span>
-              </p>
-              <p className="text-[10px] text-slate-500">Predicted daily spend rate</p>
-            </div>
-            <div className="glass-card p-5 border border-white/5 space-y-1">
-              <span className="text-xs text-slate-400">Weekly Forecast</span>
-              <p className="text-2xl font-bold text-indigo-300">
-                {data.weekly_usage} <span className="text-xs text-slate-400">credits</span>
-              </p>
-              <p className="text-[10px] text-slate-500">Aggregated next 7 days</p>
-            </div>
-            <div className="glass-card p-5 border border-white/5 space-y-1">
-              <span className="text-xs text-slate-400">Monthly Spending Forecast</span>
-              <p className="text-2xl font-bold text-emerald-400">
-                ${data.monthly_cost}
-              </p>
-              <p className="text-[10px] text-slate-500">Run-rate cost estimation</p>
-            </div>
-            <div className="glass-card p-5 border border-purple-500/30 bg-gradient-to-r from-purple-950/20 to-indigo-950/20 space-y-1">
-              <span className="text-xs text-purple-300">Credit Exhaustion Date</span>
-              <p className="text-2xl font-bold text-amber-400 flex items-center gap-1.5">
-                <Calendar size={20} />
-                {data.credit_exhaustion_date}
-              </p>
-              <p className="text-xs text-amber-300 font-medium">
-                ~{data.days_until_exhaustion} days remaining
-              </p>
+      {/* ── 4 Top Prediction Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Future Monthly Spending */}
+        <div className="glass-card p-5 border border-white/10 hover:border-brand-500/30 transition-all space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400">Future Monthly Spend</span>
+            <div className="w-8 h-8 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
+              <TrendingDown size={16} />
             </div>
           </div>
-
-          {/* Forecast Series Chart */}
-          <div className="glass-card p-6 border border-white/5">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <TrendingUp className="text-brand-400" size={18} />
-                  14-Day Future Consumption Forecast
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Historical usage trends merged with auto-regression predictions
-                </p>
-              </div>
-              <span className="px-3 py-1 rounded-full bg-brand-600/20 border border-brand-500/30 text-brand-300 text-xs font-semibold">
-                Model: {data.best_model_name}
-              </span>
-            </div>
-
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.forecast_series} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: "#94a3b8", fontSize: 11 }}
-                    tickFormatter={(tick) => tick.slice(5)}
-                  />
-                  <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#1f1f2a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12 }}
-                    labelStyle={{ color: "#94a3b8" }}
-                    itemStyle={{ color: "#e2e8f0" }}
-                  />
-                  <Legend verticalAlign="top" height={36} />
-                  <Line
-                    type="monotone"
-                    dataKey="actual_credits"
-                    name="Actual Consumption"
-                    stroke="#06b6d4"
-                    strokeWidth={3}
-                    dot={{ r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="predicted_credits"
-                    name="ML Predicted Forecast"
-                    stroke="#7c3aed"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    dot={{ r: 3 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Algorithm Model Comparison Table */}
-            <div className="glass-card p-6 border border-white/5 space-y-4">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <BarChart3 className="text-brand-400" size={18} />
-                  Algorithm Evaluation & Comparison
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Performance validation metrics calculated across regression algorithms
-                </p>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-white/10 text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
-                      <th className="py-3 px-3">Algorithm</th>
-                      <th className="py-3 px-3 text-right">MAE</th>
-                      <th className="py-3 px-3 text-right">RMSE</th>
-                      <th className="py-3 px-3 text-right">R² Score</th>
-                      <th className="py-3 px-3 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
-                    {data.models_evaluation.map((model) => (
-                      <tr
-                        key={model.algorithm_name}
-                        className={model.is_best ? "bg-brand-600/10 border-l-2 border-brand-500 font-medium text-white" : ""}
-                      >
-                        <td className="py-3.5 px-3 font-semibold">{model.algorithm_name}</td>
-                        <td className="py-3.5 px-3 text-right font-mono">{model.mae}</td>
-                        <td className="py-3.5 px-3 text-right font-mono">{model.rmse}</td>
-                        <td className="py-3.5 px-3 text-right font-mono text-brand-300 font-bold">{model.r2_score}</td>
-                        <td className="py-3.5 px-3 text-center">
-                          {model.is_best ? (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold text-[9px]">
-                              Active Predictor
-                            </span>
-                          ) : (
-                            <span className="text-slate-500 text-[10px]">Evaluated</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Feature Importance Panel */}
-            <div className="glass-card p-6 border border-white/5 space-y-4">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <ShieldCheck className="text-brand-400" size={18} />
-                  Predictor Feature Importances
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Relative contribution score of input variables to predictions
-                </p>
-              </div>
-
-              <div className="h-56 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.feature_importances} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 10 }} />
-                    <YAxis dataKey="feature" type="category" width={100} tick={{ fill: "#94a3b8", fontSize: 10 }} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "#1f1f2a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12 }}
-                      labelStyle={{ color: "#94a3b8" }}
-                    />
-                    <Bar dataKey="importance" name="Relative Weight" fill="#7c3aed" radius={[0, 4, 4, 0]}>
-                      {data.feature_importances.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className="p-8 text-center text-slate-400 bg-surface-800 border border-white/5 rounded-2xl">
-          Loading ML Insights...
+          <p className="text-2xl font-black text-white mt-2">
+            {data?.future_spending_amount != null ? `₹${data.future_spending_amount.toFixed(2)}` : "—"}
+          </p>
+          <p className="text-[11px] text-emerald-400 font-semibold">
+            {data?.savings_amount != null ? `You may save ₹${data.savings_amount.toFixed(0)} this month.` : "Log usage to see savings forecast."}
+          </p>
         </div>
-      )}
+
+        {/* Tomorrow's AI Forecast */}
+        <div className="glass-card p-5 border border-white/10 hover:border-cyan-500/30 transition-all space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400">Tomorrow's AI Need</span>
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+              <Zap size={16} />
+            </div>
+          </div>
+          <p className="text-xl font-black text-white mt-2 truncate">
+            {data?.recommended_tomorrow_ai ?? "—"}
+          </p>
+          <p className="text-[11px] text-cyan-300 font-medium truncate">
+            {data?.recommended_tomorrow_ai ? `You'll likely need ${data.recommended_tomorrow_ai} tomorrow.` : "Insufficient usage data."}
+          </p>
+        </div>
+
+        {/* Renewal Timeline */}
+        <div className="glass-card p-5 border border-white/10 hover:border-amber-500/30 transition-all space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400">Next Renewal</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <Calendar size={16} />
+            </div>
+          </div>
+          <p className="text-2xl font-black text-amber-300 mt-2">
+            {data?.renewal_alert_days != null ? `${data.renewal_alert_days} Days` : "—"}
+          </p>
+          <p className="text-[11px] text-amber-300/80 font-medium">
+            {data?.renewal_platform && data?.renewal_alert_days != null
+              ? `Renew ${data.renewal_platform} in ${data.renewal_alert_days} days.`
+              : "No renewals detected yet."}
+          </p>
+        </div>
+
+        {/* Budget Forecast */}
+        <div className="glass-card p-5 border border-white/10 hover:border-emerald-500/30 transition-all space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400">Budget Status</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <ShieldCheck size={16} />
+            </div>
+          </div>
+          <p className="text-2xl font-black text-emerald-400 mt-2">
+            {data ? "Healthy" : "—"}
+          </p>
+          <p className="text-[11px] text-slate-400">
+            {data?.future_spending_amount != null ? `₹${data.future_spending_amount.toFixed(0)} projected spend this month` : "Connect a platform to track budget."}
+          </p>
+        </div>
+      </div>
+
+      {/* ── 14-Day Future Consumption Forecast Chart ── */}
+      <div className="glass-card p-6 border border-white/10 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <TrendingUp className="text-brand-400" size={18} />
+              14-Day AI Consumption Trajectory & Forecast
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Past 7 days of actual consumption combined with the predicted usage for the upcoming week.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-cyan-400 inline-block" />
+              <span className="text-slate-300">Past Usage</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-brand-500 inline-block" />
+              <span className="text-brand-300 font-semibold">Predicted Forecast</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-72 w-full pt-2">
+          {!hasForecastData ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-surface-800 border border-white/5 flex items-center justify-center">
+                <TrendingUp size={22} className="text-slate-500" />
+              </div>
+              <p className="text-sm text-slate-400 font-medium">
+                {isCalibrating ? "Collecting your usage data to build the forecast..." : "No forecast data yet."}
+              </p>
+              <p className="text-xs text-slate-500">Log at least 5 AI sessions to generate a 14-day prediction.</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={forecastData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="actualGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 11 }} stroke="rgba(255,255,255,0.1)" />
+                <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} stroke="rgba(255,255,255,0.1)" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1f1f2e",
+                    borderColor: "rgba(255,255,255,0.1)",
+                    borderRadius: "12px",
+                    color: "#ffffff",
+                    fontSize: "12px",
+                  }}
+                  formatter={(val: any, name: string) => [
+                    val ? `${val} credits` : "N/A",
+                    name === "actual" ? "Recorded Consumption" : "Predicted Consumption",
+                  ]}
+                />
+                <Area type="monotone" dataKey="actual" stroke="#06b6d4" strokeWidth={3} fillOpacity={1} fill="url(#actualGradient)" />
+                <Area type="monotone" dataKey="forecast" stroke="#7c3aed" strokeWidth={2.5} strokeDasharray="4 4" fillOpacity={1} fill="url(#forecastGradient)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* ── 6 Conversational Predictive Insights Cards ── */}
+      <div className="space-y-4">
+        <div className="border-b border-white/5 pb-2">
+          <h3 className="text-base font-extrabold text-white tracking-tight">
+            Detailed Predictive Outcomes
+          </h3>
+          <p className="text-xs text-slate-400">
+            Actionable intelligence derived automatically from your past AI tasks and platform habits.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {isCalibrating || predictionsList.length === 0 ? (
+            <div className="col-span-3 flex flex-col items-center justify-center gap-4 py-10 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-surface-800 border border-white/5 flex items-center justify-center">
+                <BrainCircuit size={26} className="text-slate-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">
+                  {data?.calibration_message ?? "We're still learning your AI usage patterns."}
+                </p>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  Log AI sessions via the browser extension or connect a platform to unlock personalized predictions.
+                </p>
+              </div>
+            </div>
+          ) : (
+            predictionsList.map((pred, idx) => (
+            <div
+              key={idx}
+              className="p-5 rounded-2xl bg-surface-900/60 border border-white/5 hover:border-brand-500/30 hover:bg-surface-800/80 transition-all duration-200 flex flex-col justify-between space-y-4 group"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-surface-800 border border-white/10 flex items-center justify-center">
+                    {getCategoryIcon(pred.category)}
+                  </div>
+                  <Badge variant="outline" className={`text-[10px] font-semibold ${getBadgeClass(pred.badge_variant)}`}>
+                    {pred.badge}
+                  </Badge>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-bold text-white group-hover:text-brand-300 transition-colors leading-snug">
+                    {pred.headline}
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    {pred.message}
+                  </p>
+                </div>
+              </div>
+
+              {pred.action_text && pred.action_url && (
+                <div className="pt-3 border-t border-white/5 flex items-center justify-between">
+                  <button
+                    onClick={() => navigate(pred.action_url!)}
+                    className="text-xs font-semibold text-brand-400 hover:text-brand-300 flex items-center gap-1 group-hover:translate-x-1 transition-all"
+                  >
+                    <span>{pred.action_text}</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

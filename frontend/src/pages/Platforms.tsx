@@ -22,7 +22,14 @@ import {
   Bot,
   Zap,
   FileText,
+  Wifi,
+  WifiOff,
+  Link2,
+  HistoryIcon,
+  ShieldCheck,
+  RotateCcw,
 } from "lucide-react";
+
 
 import {
   getSupportedPlatforms,
@@ -32,6 +39,16 @@ import {
   deletePlatform,
   revealPlatformApiKey,
 } from "@/api/platforms";
+
+import {
+  getProvidersStatus,
+  connectProvider,
+  disconnectProvider,
+  syncSingleProvider,
+  getSyncHistory,
+  ProviderStatus,
+  SyncHistoryItem,
+} from "@/api/providers";
 
 import {
   SupportedPlatform,
@@ -101,17 +118,34 @@ export default function Platforms() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // ── Provider Connection State ──────────────────────────────────────────────
+  const [providerStatuses, setProviderStatuses] = useState<ProviderStatus[]>([]);
+  const [syncHistory, setSyncHistory] = useState<SyncHistoryItem[]>([]);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [connectingProvider, setConnectingProvider] = useState<ProviderStatus | null>(null);
+  const [connectApiKey, setConnectApiKey] = useState("");
+  const [showConnectKey, setShowConnectKey] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [connectSuccess, setConnectSuccess] = useState<string | null>(null);
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [syncingSlug, setSyncingSlug] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
   // Load Platforms Data
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [userPlats, catalog] = await Promise.all([
+      const [userPlats, catalog, pStatuses, history] = await Promise.all([
         getUserPlatforms(searchQuery, selectedStatusFilter),
         getSupportedPlatforms().catch(() => FALLBACK_SUPPORTED),
+        getProvidersStatus().catch(() => []),
+        getSyncHistory().catch(() => []),
       ]);
       setPlatforms(userPlats);
       if (catalog && catalog.length > 0) setSupportedCatalog(catalog);
+      setProviderStatuses(pStatuses);
+      setSyncHistory(history);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to load AI platform subscriptions");
     } finally {
@@ -279,6 +313,75 @@ export default function Platforms() {
     }
   };
 
+  // ── Provider Connect / Disconnect / Sync Actions ──────────────────────────
+  const openConnectModal = (prov: ProviderStatus) => {
+    setConnectingProvider(prov);
+    setConnectApiKey("");
+    setShowConnectKey(false);
+    setConnectError(null);
+    setConnectSuccess(null);
+    setIsConnectModalOpen(true);
+  };
+
+  const handleConnect = async () => {
+    if (!connectingProvider || !connectApiKey.trim()) {
+      setConnectError("Please enter your API key.");
+      return;
+    }
+    setConnectLoading(true);
+    setConnectError(null);
+    setConnectSuccess(null);
+    try {
+      const res = await connectProvider(connectingProvider.provider_slug, connectApiKey.trim(), true);
+      const syncResult = res.sync_result || {};
+      const recordsInserted: number = syncResult.records_inserted ?? 0;
+      const usageStatus: string = syncResult.usage_status || "";
+      const usageReason: string = syncResult.usage_reason || "";
+
+      let successMsg = `✓ ${connectingProvider.provider_name} connected successfully.`;
+      if (recordsInserted > 0) {
+        successMsg += ` ${recordsInserted} usage record${recordsInserted !== 1 ? "s" : ""} synced.`;
+      } else if (usageReason) {
+        successMsg += ` Note: ${usageReason}`;
+      } else if (usageStatus) {
+        successMsg += ` Status: ${usageStatus}`;
+      } else {
+        successMsg += " Your key is valid. Usage will be tracked via the browser extension.";
+      }
+
+      setConnectSuccess(successMsg);
+      setConnectApiKey("");
+      await fetchData();
+      setTimeout(() => setIsConnectModalOpen(false), 3500);
+    } catch (err: any) {
+      setConnectError(err.response?.data?.detail || "Connection failed. Check your API key and try again.");
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  const handleDisconnect = async (prov: ProviderStatus) => {
+    if (!confirm(`Disconnect ${prov.provider_name}? Encrypted key will be removed.`)) return;
+    try {
+      await disconnectProvider(prov.provider_slug);
+      await fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Disconnect failed.");
+    }
+  };
+
+  const handleSyncProvider = async (slug: string) => {
+    setSyncingSlug(slug);
+    try {
+      await syncSingleProvider(slug);
+      await fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Sync failed.");
+    } finally {
+      setSyncingSlug(null);
+    }
+  };
+
   const getPlatformMeta = (name: string): SupportedPlatform => {
     return (
       supportedCatalog.find((s) => s.name.toLowerCase() === name.toLowerCase()) || {
@@ -328,7 +431,7 @@ export default function Platforms() {
             AI Account Manager
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Manage your AI tool subscriptions, monthly costs, renewal dates, and status (ChatGPT, Claude, Gemini, Cursor, Copilot, Perplexity, Lovable, Bolt).
+            Connect official AI provider APIs, manage subscriptions, and auto-sync usage data.
           </p>
         </div>
 
@@ -342,6 +445,171 @@ export default function Platforms() {
             <Plus size={16} className="mr-1.5" />
             Add AI Subscription
           </Button>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ── CONNECT PROVIDERS SECTION ──────────────────────────────────────
+          ══════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-3xl border border-white/10 bg-surface-800/80 backdrop-blur-xl overflow-hidden">
+        {/* Section Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-surface-900/60">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+              <Link2 size={18} />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-white">Connect AI Providers via API Key</h2>
+              <p className="text-[11px] text-slate-400">Link your official API keys to sync real usage data automatically.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+          >
+            <HistoryIcon size={14} />
+            {showHistory ? "Hide" : "Sync History"}
+          </button>
+        </div>
+
+        {/* Provider Cards Grid */}
+        <div className="p-6">
+          {providerStatuses.length === 0 && !loading ? (
+            <div className="text-center text-slate-500 text-xs py-6">
+              Could not load provider status. Ensure the backend is running.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {(providerStatuses.length > 0 ? providerStatuses : [
+                { provider_slug: "openai", provider_name: "OpenAI", is_connected: false, status: "disconnected", last_sync_at: "Never", last_sync_status: "never", supports_billing_api: true, billing_status: "Supported", available_models: ["gpt-4o"] },
+                { provider_slug: "anthropic", provider_name: "Anthropic", is_connected: false, status: "disconnected", last_sync_at: "Never", last_sync_status: "never", supports_billing_api: false, billing_status: "Not Supported", available_models: ["claude-3-5-sonnet-20241022"] },
+                { provider_slug: "gemini", provider_name: "Gemini", is_connected: false, status: "disconnected", last_sync_at: "Never", last_sync_status: "never", supports_billing_api: false, billing_status: "Not Supported", available_models: ["gemini-1.5-pro"] },
+                { provider_slug: "perplexity", provider_name: "Perplexity", is_connected: false, status: "disconnected", last_sync_at: "Never", last_sync_status: "never", supports_billing_api: true, billing_status: "Supported", available_models: ["sonar-pro"] },
+              ] as ProviderStatus[]).map((prov) => (
+                <div
+                  key={prov.provider_slug}
+                  className={`rounded-2xl border p-4 flex flex-col gap-3 transition-all ${
+                    prov.is_connected
+                      ? "border-emerald-500/40 bg-emerald-500/5"
+                      : "border-white/10 bg-surface-900/60 hover:border-white/20"
+                  }`}
+                >
+                  {/* Provider Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm ${
+                        prov.provider_slug === "openai" ? "bg-[#10A37F]/20 text-[#10A37F]" :
+                        prov.provider_slug === "anthropic" ? "bg-[#D4A96A]/20 text-[#D4A96A]" :
+                        prov.provider_slug === "gemini" ? "bg-[#4285F4]/20 text-[#4285F4]" :
+                        "bg-[#20B2AA]/20 text-[#20B2AA]"
+                      }`}>
+                        {prov.provider_name[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{prov.provider_name}</p>
+                        <p className="text-[10px] text-slate-500 font-mono">{prov.available_models[0]}</p>
+                      </div>
+                    </div>
+                    {prov.is_connected ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Live
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-surface-800 border border-white/10 px-2 py-0.5 rounded-full">
+                        <WifiOff size={10} /> Off
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Status Details */}
+                  <div className="space-y-1.5 text-[11px]">
+                    {prov.is_connected && (
+                      <div className="flex items-center gap-1.5 text-slate-400">
+                        <Key size={11} className="text-slate-500" />
+                        <span className="font-mono truncate">{prov.masked_key || "sk-..."}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Last sync</span>
+                      <span className={`font-semibold ${
+                        prov.last_sync_status === "success" ? "text-emerald-400" :
+                        prov.last_sync_status === "failed" ? "text-rose-400" : "text-slate-500"
+                      }`}>
+                        {prov.last_sync_at === "Never" ? "Never" : prov.last_sync_at?.split(" ")[0]}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Billing API</span>
+                      <span className={prov.supports_billing_api ? "text-emerald-400 font-semibold" : "text-slate-500"}>
+                        {prov.supports_billing_api ? "✓ Supported" : "Not Available"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 pt-1">
+                    {prov.is_connected ? (
+                      <>
+                        <button
+                          onClick={() => handleSyncProvider(prov.provider_slug)}
+                          disabled={syncingSlug === prov.provider_slug}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold py-1.5 rounded-lg bg-brand-600/20 border border-brand-500/30 text-brand-300 hover:bg-brand-600/30 transition-all disabled:opacity-50"
+                        >
+                          <RotateCcw size={11} className={syncingSlug === prov.provider_slug ? "animate-spin" : ""} />
+                          {syncingSlug === prov.provider_slug ? "Syncing..." : "Sync Now"}
+                        </button>
+                        <button
+                          onClick={() => handleDisconnect(prov)}
+                          className="flex items-center justify-center gap-1 text-[11px] font-semibold py-1.5 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-all"
+                        >
+                          <WifiOff size={11} /> Disconnect
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => openConnectModal(prov)}
+                        className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition-all shadow-glow-sm"
+                      >
+                        <Link2 size={12} /> Connect with API Key
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Sync History Collapsible */}
+          {showHistory && (
+            <div className="mt-5 pt-5 border-t border-white/10 space-y-3">
+              <div className="flex items-center gap-2">
+                <HistoryIcon size={14} className="text-slate-400" />
+                <h3 className="text-xs font-bold text-white">Recent Sync History</h3>
+              </div>
+              {syncHistory.length === 0 ? (
+                <p className="text-xs text-slate-500 py-3 text-center">No sync history yet. Connect a provider and run your first sync.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                  {syncHistory.slice(0, 20).map((h) => (
+                    <div key={h.id} className="flex items-center justify-between text-[11px] px-3 py-2 rounded-lg bg-surface-900/60 border border-white/5">
+                      <div className="flex items-center gap-2">
+                        {h.status === "success" ? (
+                          <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
+                        ) : (
+                          <XCircle size={12} className="text-rose-400 shrink-0" />
+                        )}
+                        <span className="font-semibold text-slate-300 capitalize">{h.provider_slug}</span>
+                        <span className="text-slate-500">·</span>
+                        <span className="text-slate-400">{h.records_ingested} records</span>
+                      </div>
+                      <span className="text-slate-600 font-mono tabular-nums">{h.sync_time.split(" ")[0]}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -976,6 +1244,159 @@ export default function Platforms() {
                   {copiedKey ? "Copied!" : "Copy"}
                 </Button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── CONNECT PROVIDER MODAL ── */}
+      {isConnectModalOpen && connectingProvider && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-surface-800 shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-white/10 bg-surface-900/60 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm ${
+                  connectingProvider.provider_slug === "openai" ? "bg-[#10A37F]/20 text-[#10A37F]" :
+                  connectingProvider.provider_slug === "anthropic" ? "bg-[#D4A96A]/20 text-[#D4A96A]" :
+                  connectingProvider.provider_slug === "gemini" ? "bg-[#4285F4]/20 text-[#4285F4]" :
+                  "bg-[#20B2AA]/20 text-[#20B2AA]"
+                }`}>
+                  {connectingProvider.provider_name[0]}
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white">
+                    Connect {connectingProvider.provider_name}
+                  </h2>
+                  <p className="text-[11px] text-slate-400">Enter your official API key to link this provider.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsConnectModalOpen(false)}
+                className="text-slate-400 hover:text-white font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 text-xs">
+              {/* Success Banner */}
+              {connectSuccess && (
+                <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 animate-fade-in">
+                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                  <p className="text-emerald-300 font-semibold">{connectSuccess}</p>
+                </div>
+              )}
+
+              {/* Error Banner */}
+              {connectError && (
+                <div className="flex items-center gap-3 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 animate-fade-in">
+                  <AlertTriangle size={16} className="text-rose-400 shrink-0" />
+                  <p className="text-rose-300">{connectError}</p>
+                </div>
+              )}
+
+              {/* Where to Get Key */}
+              <div className="p-3.5 rounded-xl bg-brand-500/5 border border-brand-500/20 space-y-1">
+                <p className="font-bold text-brand-300 flex items-center gap-1.5">
+                  <Key size={12} /> Where to get your API key:
+                </p>
+                <p className="text-slate-400 leading-relaxed">
+                  {connectingProvider.provider_slug === "openai" && (
+                    <><span className="text-slate-200">OpenAI:</span> platform.openai.com → API keys → Create new secret key</>
+                  )}
+                  {connectingProvider.provider_slug === "anthropic" && (
+                    <><span className="text-slate-200">Anthropic:</span> console.anthropic.com → API keys → Create Key</>
+                  )}
+                  {connectingProvider.provider_slug === "gemini" && (
+                    <><span className="text-slate-200">Gemini:</span> aistudio.google.com → Get API key → Create API key</>
+                  )}
+                  {connectingProvider.provider_slug === "perplexity" && (
+                    <><span className="text-slate-200">Perplexity:</span> perplexity.ai/settings/api → Generate</>
+                  )}
+                </p>
+              </div>
+
+              {/* API Key Input */}
+              <div>
+                <label className="block font-semibold text-slate-300 mb-1.5">
+                  API Key
+                </label>
+                <div className="relative">
+                  <Key size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type={showConnectKey ? "text" : "password"}
+                    value={connectApiKey}
+                    onChange={(e) => setConnectApiKey(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+                    placeholder={
+                      connectingProvider.provider_slug === "openai" ? "sk-proj-..." :
+                      connectingProvider.provider_slug === "anthropic" ? "sk-ant-..." :
+                      connectingProvider.provider_slug === "gemini" ? "AIza..." :
+                      "pplx-..."
+                    }
+                    className="w-full pl-10 pr-12 py-2.5 rounded-xl border border-white/10 bg-surface-900/60 text-slate-100 text-xs font-mono placeholder:text-slate-600 focus:border-brand-500 focus:outline-none transition-colors"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConnectKey(!showConnectKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  >
+                    <Eye size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Security Note */}
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-surface-900/60 border border-white/5">
+                <ShieldCheck size={13} className="text-emerald-400 mt-0.5 shrink-0" />
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Your API key is <span className="text-emerald-300 font-semibold">encrypted with AES-256</span> before being stored. It is never logged or transmitted in plain text.
+                </p>
+              </div>
+
+              {/* What happens after connect */}
+              <div className="space-y-1.5">
+                <p className="font-semibold text-slate-300">After connecting:</p>
+                <div className="space-y-1">
+                  {["API key will be validated in real-time", "An initial sync will run automatically", "Usage data will appear on your Dashboard", "Auto-sync runs every hour in the background"].map((step, i) => (
+                    <div key={i} className="flex items-center gap-2 text-slate-400">
+                      <span className="w-4 h-4 rounded-full bg-brand-600/30 text-brand-300 flex items-center justify-center text-[9px] font-bold shrink-0">{i + 1}</span>
+                      <span>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2 border-t border-white/10">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsConnectModalOpen(false)}
+                  className="flex-1"
+                  disabled={connectLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConnect}
+                  disabled={connectLoading || !connectApiKey.trim()}
+                  className="flex-1 btn-primary"
+                >
+                  {connectLoading ? (
+                    <span className="flex items-center gap-2">
+                      <RefreshCw size={13} className="animate-spin" />
+                      Validating & Connecting...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Wifi size={13} />
+                      Connect {connectingProvider.provider_name}
+                    </span>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

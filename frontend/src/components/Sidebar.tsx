@@ -11,21 +11,26 @@ import {
   User,
   LogOut,
   MessageSquareText,
+  GitFork,
+  Bell,
+  Bot,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { to: "/",               label: "Dashboard",       icon: LayoutDashboard },
-  { to: "/platforms",      label: "AI Tools",        icon: Layers },
-  { to: "/credits",        label: "Subscriptions",   icon: CreditCard },
-  { to: "/analytics",      label: "Usage & Costs",   icon: BarChart3 },
-  { to: "/usage-tracker",  label: "Usage Tracker",   icon: Activity },
-  { to: "/recommendations",label: "Tool Optimizer",  icon: Sparkles },
-  { to: "/task-advisor",   label: "Task Advisor",    icon: MessageSquareText },
-  { to: "/profile",        label: "User Profile",    icon: User },
-  { to: "/settings",       label: "Settings",        icon: Settings },
+  { to: "/",                 label: "Dashboard",        icon: LayoutDashboard },
+  { to: "/assistant",        label: "AI Advisor",       icon: Bot },
+  { to: "/workflow-planner", label: "Workflow Planner", icon: GitFork },
+  { to: "/budget-planner",   label: "Budget Planner",   icon: Sparkles },
+  { to: "/notifications",    label: "Notifications",    icon: Bell },
+  { to: "/platforms",        label: "AI Tools",         icon: Layers },
+  { to: "/credits",          label: "Subscriptions",    icon: CreditCard },
+  { to: "/analytics",        label: "Usage & Costs",    icon: BarChart3 },
+  { to: "/task-advisor",     label: "Task Advisor",     icon: MessageSquareText },
+  { to: "/profile",          label: "User Profile",     icon: User },
+  { to: "/settings",         label: "Settings",         icon: Settings },
 ];
 
 interface SidebarProps {

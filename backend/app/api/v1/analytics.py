@@ -98,12 +98,32 @@ def get_ml_analytics(
 ):
     """
     ML Prediction Endpoint.
-    Runs regression & forecasting models (Linear Regression, Random Forest, XGBoost)
-    to predict Daily Usage, Weekly Usage, Monthly Spending, Budget Forecast, and Credit Exhaustion.
+    Runs regression & forecasting models (Random Forest, XGBoost, Gradient Boosting)
+    in the background and returns structured forecast and user-friendly predictions.
     """
     from app.services.ml_service import MLPredictionEngine
     engine = MLPredictionEngine(db)
     return engine.update_predictions_for_user(current_user.id)
+
+
+@router.get("/predictions")
+def get_smart_predictions(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    User-Friendly Machine Learning Predictions Endpoint.
+    Returns 6 intelligent predictions comparing models in the background:
+    1. Preferred AI Platform
+    2. Future Monthly Spending ('You may save ₹250 this month.')
+    3. Subscription Renewal Risk ('You should renew Claude in 4 days.')
+    4. Most Likely AI Needed Tomorrow ('You'll probably need ChatGPT tomorrow.')
+    5. Personal Usage Pattern
+    6. Budget Forecast
+    """
+    from app.services.ml_service import MLPredictionEngine
+    engine = MLPredictionEngine(db)
+    return engine.get_predictions(current_user.id)
 
 
 @router.get("/usage-summary")

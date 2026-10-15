@@ -2,13 +2,18 @@ import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import TopNav from "@/components/TopNav";
+import AssistantDrawer from "@/components/AssistantDrawer";
 
 const PAGE_TITLES: Record<string, string> = {
   "/":               "Dashboard Overview",
+  "/assistant":      "AI Personal Assistant",
   "/platforms":      "AI Tools & Platforms",
   "/credits":        "AI Subscriptions",
   "/analytics":      "Usage & Cost Analytics",
   "/recommendations":"AI Tool Optimizer",
+  "/budget-planner": "AI Budget Planner",
+  "/workflow-planner": "AI Workflow Planner",
+  "/notifications":  "Smart Notifications Hub",
   "/task-advisor":   "Smart Task Advisor",
   "/profile":        "User Profile",
   "/settings":       "Settings",
@@ -34,6 +39,9 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* ── Global Floating Personal Advisor Launcher ── */}
+      <AssistantDrawer />
     </div>
   );
 }

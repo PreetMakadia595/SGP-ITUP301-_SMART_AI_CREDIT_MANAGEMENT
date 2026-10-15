@@ -3,9 +3,11 @@
  */
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Bell, Search, Menu, User, LogOut, Settings } from "lucide-react";
+import { Bell, Search, Menu, User, LogOut, Settings, Sun, Moon } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useAuth } from "@/hooks/useAuth";
+import { useThemeStore } from "@/store/themeStore";
+import NotificationPopover from "@/components/NotificationPopover";
 
 interface TopNavProps {
   onMenuToggle?: () => void;
@@ -15,7 +17,10 @@ interface TopNavProps {
 export default function TopNav({ onMenuToggle, title = "Dashboard" }: TopNavProps) {
   const user = useAuthStore((s) => s.user);
   const { logout } = useAuth();
+  const { theme, toggleTheme } = useThemeStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(3);
   const navigate = useNavigate();
 
   return (
@@ -44,11 +49,39 @@ export default function TopNav({ onMenuToggle, title = "Dashboard" }: TopNavProp
         />
       </div>
 
-      {/* ── Notifications ── */}
-      <button id="topnav-notifications-btn" className="btn-ghost p-2 relative" aria-label="Notifications">
-        <Bell size={18} />
-        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-surface-800" />
+      {/* ── Theme Toggle ── */}
+      <button
+        id="topnav-theme-toggle-btn"
+        onClick={toggleTheme}
+        className="btn-ghost p-2 text-amber-400 hover:text-amber-300 transition-transform active:scale-95"
+        title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+        aria-label="Toggle dark/light theme"
+      >
+        {theme === "dark" ? <Sun size={18} /> : <Moon size={18} className="text-brand-400" />}
       </button>
+
+      {/* ── Notifications ── */}
+      <div className="relative">
+        <button
+          id="topnav-notifications-btn"
+          onClick={() => setNotifOpen(!notifOpen)}
+          className="btn-ghost p-2 relative"
+          aria-label="Notifications"
+        >
+          <Bell size={18} />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 px-1 min-w-[16px] h-4 bg-brand-500 text-white rounded-full text-[10px] font-extrabold flex items-center justify-center ring-2 ring-surface-800 animate-pulse">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+
+        <NotificationPopover
+          isOpen={notifOpen}
+          onClose={() => setNotifOpen(false)}
+          onCountChange={(count) => setUnreadCount(count)}
+        />
+      </div>
 
       {/* ── Avatar Dropdown ── */}
       <div className="relative">

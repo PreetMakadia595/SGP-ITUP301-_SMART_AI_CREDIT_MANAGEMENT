@@ -29,6 +29,89 @@ body {
 ::-webkit-scrollbar-thumb { @apply bg-surface-500 rounded-full; }
 ::-webkit-scrollbar-thumb:hover { @apply bg-brand-600; }
 
+/* ── Theme Overrides (Light Mode) ────────────────────────────────────────── */
+html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.light .glass-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light header {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+html.light aside {
+  background-color: #ffffff !important;
+  border-right-color: #e2e8f0 !important;
+}
+
+html.light .input-field,
+html.light .input {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light select.input-field,
+html.light select.input,
+html.light select {
+  color: #0f172a !important;
+  background-color: #f1f5f9 !important;
+}
+
+html.light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.light .text-white,
+html.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-300,
+html.light .text-slate-400 {
+  color: #475569 !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .bg-surface-900 {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-surface-800 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-surface-700 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-surface-600 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .border-white\/5,
+html.light .border-white\/10 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
 /* ── Glass Card ─────────────────────────────────────────────────────────── */
 .glass-card {
   @apply bg-surface-800 border border-white/5 rounded-2xl;

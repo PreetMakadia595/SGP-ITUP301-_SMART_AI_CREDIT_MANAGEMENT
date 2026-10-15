@@ -15,6 +15,10 @@ import Platforms      from "@/pages/Platforms";
 import Credits        from "@/pages/Credits";
 import Analytics      from "@/pages/Analytics";
 import TaskAdvisor   from "@/pages/TaskAdvisor";
+import BudgetPlanner from "@/pages/BudgetPlanner";
+import WorkflowPlanner from "@/pages/WorkflowPlanner";
+import Notifications from "@/pages/Notifications";
+import PersonalAssistant from "@/pages/PersonalAssistant";
 
 export default function App() {
   return (
@@ -30,12 +34,16 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/"          element={<Dashboard />} />
+            <Route path="/assistant" element={<PersonalAssistant />} />
             <Route path="/platforms" element={<Platforms />} />
             <Route path="/profile"   element={<Profile />} />
             <Route path="/settings"  element={<Settings />} />
             <Route path="/credits"   element={<Credits />} />
             <Route path="/analytics"        element={<Analytics />} />
-            <Route path="/recommendations"  element={<PlaceholderPage title="AI Advisor" />} />
+            <Route path="/recommendations"  element={<BudgetPlanner />} />
+            <Route path="/budget-planner"   element={<BudgetPlanner />} />
+            <Route path="/workflow-planner" element={<WorkflowPlanner />} />
+            <Route path="/notifications"    element={<Notifications />} />
             <Route path="/task-advisor"     element={<TaskAdvisor />} />
           </Route>
         </Route>

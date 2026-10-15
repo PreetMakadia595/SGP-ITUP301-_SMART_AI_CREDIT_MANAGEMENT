@@ -2,7 +2,7 @@
 Abstract Base Provider Interface for AI Platform Integrations
 """
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 
 class BaseAIProvider(ABC):
@@ -26,19 +26,34 @@ class BaseAIProvider(ABC):
         pass
 
     @abstractmethod
-    async def sync_usage(self, api_key: str) -> Dict[str, Any]:
-        """Fetch usage information from official API if supported."""
+    async def sync_usage(
+        self,
+        api_key: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Fetch usage information from official API if supported.
+        Returns:
+            {
+                "supported": bool,
+                "status_text": str,
+                "records": List[Dict[str, Any]],  # parsed real events
+                "reason": Optional[str],
+                "raw_rate_limits": Optional[Dict[str, Any]],
+            }
+        """
         pass
 
     @abstractmethod
     async def sync_billing(self, api_key: str) -> Dict[str, Any]:
         """
         Fetch billing or credit information.
-        If billing API is NOT supported, returns: {"supported": False, "status_text": "Not Supported"}
+        If billing API is NOT supported, returns: {"supported": False, "status_text": "Not Supported", "reason": "..."}
         """
         pass
 
     @abstractmethod
     async def sync_subscription(self, api_key: str) -> Dict[str, Any]:
-        """Fetch subscription details."""
+        """Fetch subscription details if officially exposed."""
         pass

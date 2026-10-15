@@ -50,7 +50,14 @@ export async function ingestManualEntry(payload: ManualIngestionPayload): Promis
   return data;
 }
 
+import { MLPredictionsResponse } from "@/types/ml";
+
 export async function getMLAnalytics(): Promise<any> {
   const { data } = await apiClient.get("/analytics/ml");
+  return data;
+}
+
+export async function getSmartPredictions(): Promise<MLPredictionsResponse> {
+  const { data } = await apiClient.get<MLPredictionsResponse>("/analytics/predictions");
   return data;
 }
